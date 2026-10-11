@@ -11,15 +11,11 @@ Installs a complete, private container registry:
 
 ## Install
 
-Build the Regix image and push it somewhere your cluster can pull from (see the
-[project README](../../../README.md#install)). Then write a values file:
+Write a values file:
 
 ```yaml
 # my-values.yaml
 ui:
-  image:
-    repository: registry.example.com/tools/regix
-    tag: "1.0.0"
   ingress:
     enabled: true
     className: traefik
@@ -52,7 +48,7 @@ helm install registry deploy/helm/regix \
 Then `docker login registry.example.com`, and open `https://regix.example.com` and sign in with the
 same username and password.
 
-To try the chart without an ingress or a pushed image, see [ci/test-values.yaml](ci/test-values.yaml)
+To try the chart without an ingress, see [ci/test-values.yaml](ci/test-values.yaml)
 and the port-forward command that `helm install` prints.
 
 ## Accounts
@@ -114,7 +110,7 @@ The settings you are most likely to change. [values.yaml](values.yaml) documents
 | `registry.garbageCollection.schedule` | `30 3 * * *` | When the registry restarts to free the space of deleted images. |
 | `registry.ingress.host` | `""` | The registry's public host name. |
 | `registry.configOverrides` | `{}` | Merged over the generated registry configuration. |
-| `ui.image.repository` / `tag` | `regix` / chart `appVersion` | The Regix image. |
+| `ui.image.repository` / `tag` | `amanj/regix` / chart `appVersion` | The Regix image. |
 | `ui.authMode` | `registry` | `registry`, `static` or `none`. |
 | `ui.readOnly` | `false` | Switch off deleting in the UI. |
 | `ui.protectedTags` | `[]` | Tags the UI refuses to delete. |
@@ -127,5 +123,3 @@ The settings you are most likely to change. [values.yaml](values.yaml) documents
 - **Object storage** (S3 and the like) instead of a volume: set the storage driver in
   `registry.configOverrides.storage`, pass keys through `registry.extraEnv`, and set
   `registry.persistence.enabled: false`.
-- **Pulling the Regix image from this same registry** works once it has been pushed there, with
-  `imagePullSecrets`; for the first install, load the image onto the node or use another registry.

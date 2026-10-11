@@ -2,7 +2,6 @@
 #
 # The least you need to set:
 #
-#   ui.image.repository          where you pushed the Regix image
 #   registry.auth.users          who may push, pull and sign in to the UI
 #   registry.ingress.host        the name clients use in `docker push` / `docker pull`
 #   ui.ingress.host              where people open the UI
@@ -12,7 +11,7 @@
 nameOverride: ""
 fullnameOverride: ""
 
-# Pull secrets for the images of this chart (the Regix image usually lives in a private registry).
+# Pull secrets for the images of this chart, if you mirror them into a private registry.
 imagePullSecrets: []
 #  - name: regcred
 
@@ -115,9 +114,7 @@ ui:
   enabled: true
 
   image:
-    # Regix is not published to a public registry: build it (see the project README) and name
-    # the image here.
-    repository: regix
+    repository: amanj/regix
     # Defaults to the chart's appVersion.
     tag: ""
     pullPolicy: IfNotPresent

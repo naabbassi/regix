@@ -2,7 +2,7 @@
 # the other targets use a local Go and Node.js.
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-IMAGE   ?= regix:$(VERSION)
+IMAGE   ?= amanj/regix:$(VERSION)
 
 .PHONY: ui build test check image demo demo-down
 

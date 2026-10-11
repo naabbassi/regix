@@ -50,19 +50,16 @@ Open <http://localhost:8080> and sign in as `demo` / `demo-password`.
 
 ## Install
 
-Regix is not yet published to a public registry; build the image once and push it to your own:
-
-```bash
-docker build -t registry.example.com/tools/regix:1.0.0 .
-docker push registry.example.com/tools/regix:1.0.0
-```
+The image is on Docker Hub as [`amanj/regix`](https://hub.docker.com/r/amanj/regix), for
+`linux/amd64` and `linux/arm64`. Use a version tag such as `amanj/regix:0.1.0` in production;
+`latest` is the newest release and `edge` the current `main` branch.
 
 ### Docker
 
 ```bash
 docker run -d --name regix -p 8080:8080 \
   -e REGIX_REGISTRY_URL=https://registry.example.com \
-  registry.example.com/tools/regix:1.0.0
+  amanj/regix:latest
 ```
 
 ### Docker Compose
@@ -80,7 +77,6 @@ authentication and scheduled garbage collection, and Regix in front of it.
 
 ```bash
 helm install registry deploy/helm/regix --namespace registry --create-namespace \
-  --set ui.image.repository=registry.example.com/tools/regix --set ui.image.tag=1.0.0 \
   --set registry.auth.users[0].username=ci --set registry.auth.users[0].password="$CI_PASSWORD"
 ```
 
@@ -88,7 +84,7 @@ It can also install only the UI (`registry.enabled=false`).
 
 ### Kubernetes with plain manifests: UI only
 
-Set your registry's address and image in
+Set your registry's address in
 [deploy/kubernetes/deployment.yaml](deploy/kubernetes/deployment.yaml) and your host name in
 [deploy/kubernetes/ingress.yaml](deploy/kubernetes/ingress.yaml), then:
 

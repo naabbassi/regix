@@ -40,3 +40,20 @@ Regix aims to stay small. A change fits when it keeps these true:
   the server from fresh data.
 
 [docs/architecture.md](docs/architecture.md) explains how the pieces fit together.
+
+## Releasing
+
+The [Release workflow](.github/workflows/release.yml) publishes the image to Docker Hub as
+`amanj/regix`. Every push to `main` updates `amanj/regix:edge`. To cut a release:
+
+1. Set `version` and `appVersion` in [deploy/helm/regix/Chart.yaml](deploy/helm/regix/Chart.yaml)
+   to the new version (the chart deploys the image tagged with its `appVersion`).
+2. Tag and push:
+
+   ```bash
+   git tag v0.1.0
+   git push origin v0.1.0
+   ```
+
+The workflow then pushes `amanj/regix:0.1.0`, `:0.1` and `:latest` for `linux/amd64` and
+`linux/arm64`. A pre-release tag such as `v0.2.0-rc.1` publishes only that exact tag.
