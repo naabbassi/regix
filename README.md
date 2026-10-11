@@ -7,6 +7,8 @@ A small, fast web interface for a self-hosted Docker / OCI registry
 Browse repositories and tags, see what an image is made of, find out what takes up space, and
 delete what you no longer need, without `curl` and without changing anything in the registry.
 
+![The repositories overview in Regix](docs/screenshots/repositories-dark.png)
+
 - **One container, nothing else.** A 16 MB image with a single static binary. No database, no
   cache server, no sidecar. It uses 5 to 15 MB of memory.
 - **Works with the registry you have.** Regix talks to the standard registry API. Point it at the
@@ -26,6 +28,14 @@ delete what you no longer need, without `curl` and without changing anything in 
 | **Images** | Layers with the build step that produced each one, entrypoint, environment, ports, labels, and the raw manifest. Multi-platform images show each platform. |
 | **Deleting** | Remove one tag or many. An image is deleted when its last tag goes; otherwise only the tag is removed. |
 | **Comfort** | Light and dark themes, works on a phone, `/` to search, one-click copy of pull commands and digests. |
+
+## Screenshots
+
+| | |
+|---|---|
+| **Tags of a repository**, with digest, platforms, size and build time<br><br>![Tag list](docs/screenshots/tags.png) | **An image**, layer by layer, for each platform<br><br>![Image detail](docs/screenshots/image.png) |
+| **Deleting** says what will happen and asks for the name<br><br>![Delete confirmation](docs/screenshots/delete.png) | **Light theme**<br><br>![Repositories in the light theme](docs/screenshots/repositories-light.png) |
+| **Sign-in** with registry credentials<br><br>![Sign-in page](docs/screenshots/sign-in.png) | **On a phone**<br><br><img src="docs/screenshots/mobile.png" alt="Tag list on a phone" width="280"> |
 
 ## Try it
 
