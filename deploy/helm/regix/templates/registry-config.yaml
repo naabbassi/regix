@@ -1,0 +1,11 @@
+{{- if .Values.registry.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "regix.registry.name" . }}
+  labels:
+    {{- include "regix.labels" (dict "root" . "component" "registry") | nindent 4 }}
+data:
+  config.yml: |
+    {{- include "regix.registry.config" . | nindent 4 }}
+{{- end }}

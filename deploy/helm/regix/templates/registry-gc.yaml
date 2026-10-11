@@ -1,0 +1,94 @@
+{{- if and .Values.registry.enabled .Values.registry.garbageCollection.enabled .Values.registry.deleteEnabled }}
+{{- /* Restarts the registry on a schedule; its init container then collects the garbage. */}}
+{{- $registry := include "regix.registry.name" . }}
+{{- $name := printf "%s-gc" $registry }}
+{{- $labels := include "regix.labels" (dict "root" . "component" "registry-gc") }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- $labels | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- $labels | nindent 4 }}
+rules:
+  # Exactly what `kubectl rollout restart` needs, for this one StatefulSet.
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    resourceNames: [{{ $registry | quote }}]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- $labels | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  schedule: {{ .Values.registry.garbageCollection.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            {{- include "regix.selectorLabels" (dict "root" . "component" "registry-gc") | nindent 12 }}
+        spec:
+          serviceAccountName: {{ $name }}
+          restartPolicy: Never
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: restart
+              image: {{ printf "%s:%s" .Values.registry.garbageCollection.kubectlImage.repository .Values.registry.garbageCollection.kubectlImage.tag }}
+              imagePullPolicy: {{ .Values.registry.garbageCollection.kubectlImage.pullPolicy }}
+              args: ["rollout", "restart", "statefulset/{{ $registry }}"]
+              env:
+                - name: HOME
+                  value: /tmp
+              securityContext:
+                {{- include "regix.containerSecurityContext" . | nindent 16 }}
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+{{- end }}

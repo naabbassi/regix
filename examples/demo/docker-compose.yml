@@ -1,0 +1,38 @@
+# A complete demo: a registry with a few images in it, and Regix in front of it.
+#
+#   docker compose up --build
+#
+# then open http://localhost:8080 and sign in as  demo / demo-password
+# (the registry's only user, defined in ./htpasswd).
+
+services:
+  registry:
+    image: registry:3.1.2
+    environment:
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: demo
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    volumes:
+      - ./htpasswd:/auth/htpasswd:ro
+    ports:
+      - "5001:5000"
+
+  regix:
+    build: ../..
+    environment:
+      REGIX_REGISTRY_URL: http://registry:5000
+      REGIX_REGISTRY_PULL_HOST: localhost:5001
+      REGIX_PROTECTED_TAGS: latest
+    ports:
+      - "8080:8080"
+    depends_on:
+      - registry
+
+  seed:
+    image: quay.io/skopeo/stable:latest
+    entrypoint: ["/bin/sh", "/seed.sh"]
+    volumes:
+      - ./seed.sh:/seed.sh:ro
+    depends_on:
+      - registry

@@ -1,0 +1,25 @@
+# Serve Regix over HTTPS: it handles registry credentials. This example assumes an ingress
+# controller and cert-manager; adjust the class, issuer and host to your cluster, or remove this
+# file from kustomization.yaml and use `kubectl -n regix port-forward svc/regix 8080:80`.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: regix
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: regix.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: regix
+                port:
+                  name: http
+  tls:
+    - hosts: [regix.example.com]
+      secretName: regix-tls

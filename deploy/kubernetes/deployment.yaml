@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: regix
+  labels:
+    app.kubernetes.io/name: regix
+spec:
+  # Sessions are kept in memory, so run one replica. A restart only asks users to sign in again.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: regix
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: regix
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: regix
+          image: regix:latest # replace with the image you built or pulled
+          env:
+            # The registry's in-cluster address: http://<service>.<namespace>.svc:<port>
+            - name: REGIX_REGISTRY_URL
+              value: http://registry.registry.svc:5000
+            # The public host of the registry, as used in `docker pull`.
+            - name: REGIX_REGISTRY_PULL_HOST
+              value: registry.example.com
+            - name: REGIX_PROTECTED_TAGS
+              value: latest
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]

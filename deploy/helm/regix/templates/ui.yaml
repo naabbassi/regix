@@ -1,0 +1,117 @@
+{{- if .Values.ui.enabled }}
+{{- $name := include "regix.ui.name" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "regix.labels" (dict "root" . "component" "ui") | nindent 4 }}
+spec:
+  # Sessions are kept in memory, so one replica. A restart only asks people to sign in again.
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "regix.selectorLabels" (dict "root" . "component" "ui") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "regix.selectorLabels" (dict "root" . "component" "ui") | nindent 8 }}
+      {{- with .Values.ui.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: regix
+          image: {{ printf "%s:%s" .Values.ui.image.repository (default .Chart.AppVersion .Values.ui.image.tag) }}
+          imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
+          env:
+            - name: REGIX_REGISTRY_URL
+              value: {{ include "regix.ui.registryUrl" . | quote }}
+            {{- with include "regix.ui.pullHost" . }}
+            - name: REGIX_REGISTRY_PULL_HOST
+              value: {{ . | quote }}
+            {{- end }}
+            - name: REGIX_AUTH_MODE
+              value: {{ .Values.ui.authMode | quote }}
+            - name: REGIX_READ_ONLY
+              value: {{ .Values.ui.readOnly | quote }}
+            - name: REGIX_TITLE
+              value: {{ .Values.ui.title | quote }}
+            {{- with .Values.ui.protectedTags }}
+            - name: REGIX_PROTECTED_TAGS
+              value: {{ join "," . | quote }}
+            {{- end }}
+            {{- with .Values.ui.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          securityContext:
+            {{- include "regix.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.ui.resources | nindent 12 }}
+          {{- with .Values.ui.extraVolumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.ui.extraVolumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.ui.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.ui.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.ui.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "regix.labels" (dict "root" . "component" "ui") | nindent 4 }}
+spec:
+  type: {{ .Values.ui.service.type }}
+  selector:
+    {{- include "regix.selectorLabels" (dict "root" . "component" "ui") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.ui.service.port }}
+      targetPort: http
+{{- if .Values.ui.ingress.enabled }}
+---
+{{ include "regix.ingress" (dict "root" . "name" $name "component" "ui" "ingress" .Values.ui.ingress) }}
+{{- end }}
+{{- end }}

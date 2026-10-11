@@ -1,0 +1,40 @@
+{{- $ui := include "regix.ui.name" . }}
+{{- $registry := include "regix.registry.name" . }}
+{{- if .Values.ui.enabled }}
+Regix UI:
+{{- if .Values.ui.ingress.enabled }}
+  {{ ternary "https" "http" .Values.ui.ingress.tls.enabled }}://{{ .Values.ui.ingress.host }}
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ $ui }} 8080:{{ .Values.ui.service.port }}
+  then open http://localhost:8080
+{{- end }}
+{{- if eq .Values.ui.authMode "registry" }}
+  Sign in with a registry username and password.
+{{- end }}
+{{- end }}
+{{- if .Values.registry.enabled }}
+
+Registry:
+{{- if .Values.registry.ingress.enabled }}
+  docker login {{ .Values.registry.ingress.host }}
+{{- else }}
+  In the cluster: {{ $registry }}.{{ .Release.Namespace }}.svc:{{ .Values.registry.service.port }}
+  It has no ingress, so nothing outside the cluster can push to it or pull from it yet
+  (set registry.ingress.enabled and registry.ingress.host).
+{{- end }}
+{{- if not .Values.registry.persistence.enabled }}
+
+  WARNING: registry.persistence.enabled is false. Images are lost when the registry pod restarts
+  {{- if .Values.registry.garbageCollection.enabled }}, which the garbage collection schedule does on purpose{{ end }}.
+{{- end }}
+{{- if and .Values.registry.garbageCollection.enabled .Values.registry.deleteEnabled }}
+
+  Deleted images free their disk space when the registry restarts: on the schedule
+  "{{ .Values.registry.garbageCollection.schedule }}", or now with
+  kubectl -n {{ .Release.Namespace }} rollout restart statefulset/{{ $registry }}
+{{- end }}
+{{- if .Values.registry.persistence.enabled }}
+
+  Uninstalling the release keeps the volume with the images (PersistentVolumeClaim data-{{ $registry }}-0).
+{{- end }}
+{{- end }}

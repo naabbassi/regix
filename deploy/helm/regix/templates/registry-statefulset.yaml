@@ -1,0 +1,154 @@
+{{- if .Values.registry.enabled }}
+{{- $name := include "regix.registry.name" . }}
+{{- $image := printf "%s:%s" .Values.registry.image.repository .Values.registry.image.tag }}
+{{- $collect := and .Values.registry.garbageCollection.enabled .Values.registry.deleteEnabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "regix.labels" (dict "root" . "component" "registry") | nindent 4 }}
+spec:
+  # The volume can be attached to one pod, and garbage collection needs the registry to itself.
+  replicas: 1
+  serviceName: {{ $name }}
+  selector:
+    matchLabels:
+      {{- include "regix.selectorLabels" (dict "root" . "component" "registry") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "regix.selectorLabels" (dict "root" . "component" "registry") | nindent 8 }}
+      annotations:
+        # Restart the registry when its configuration changes.
+        checksum/config: {{ include "regix.registry.config" . | sha256sum }}
+        {{- with .Values.registry.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      {{- if $collect }}
+      initContainers:
+        # Frees the storage of deleted images. It runs here, before the registry starts, because
+        # the collector must not run while images are being pushed.
+        - name: garbage-collect
+          image: {{ $image }}
+          imagePullPolicy: {{ .Values.registry.image.pullPolicy }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - >-
+              mkdir -p /var/lib/registry/docker/registry/v2/repositories /var/lib/registry/docker/registry/v2/blobs
+              && exec registry garbage-collect{{ if .Values.registry.garbageCollection.deleteUntagged }} --delete-untagged{{ end }} /etc/distribution/config.yml
+          securityContext:
+            {{- include "regix.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.registry.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/distribution/config.yml
+              subPath: config.yml
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/registry
+      {{- end }}
+      containers:
+        - name: registry
+          image: {{ $image }}
+          imagePullPolicy: {{ .Values.registry.image.pullPolicy }}
+          args: ["/etc/distribution/config.yml"]
+          env:
+            - name: REGISTRY_HTTP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-http
+                  key: http-secret
+            {{- with .Values.registry.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 5000
+            - name: debug
+              containerPort: 5001
+          readinessProbe:
+            httpGet:
+              path: /debug/health
+              port: debug
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          securityContext:
+            {{- include "regix.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.registry.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/distribution/config.yml
+              subPath: config.yml
+              readOnly: true
+            {{- if .Values.registry.auth.enabled }}
+            - name: auth
+              mountPath: /etc/distribution/auth
+              readOnly: true
+            {{- end }}
+            - name: data
+              mountPath: /var/lib/registry
+      volumes:
+        - name: config
+          configMap:
+            name: {{ $name }}
+        {{- if .Values.registry.auth.enabled }}
+        - name: auth
+          secret:
+            secretName: {{ include "regix.registry.authSecret" . }}
+            items:
+              - key: htpasswd
+                path: htpasswd
+        {{- end }}
+        {{- if not .Values.registry.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+      {{- with .Values.registry.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.registry.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.registry.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.registry.persistence.enabled }}
+  # Kubernetes keeps this volume when the release is uninstalled, so the images survive.
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          {{- toYaml .Values.registry.persistence.accessModes | nindent 10 }}
+        {{- with .Values.registry.persistence.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.registry.persistence.size }}
+  {{- end }}
+{{- end }}

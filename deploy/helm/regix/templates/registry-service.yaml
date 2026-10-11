@@ -1,0 +1,20 @@
+{{- if .Values.registry.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "regix.registry.name" . }}
+  labels:
+    {{- include "regix.labels" (dict "root" . "component" "registry") | nindent 4 }}
+spec:
+  type: {{ .Values.registry.service.type }}
+  selector:
+    {{- include "regix.selectorLabels" (dict "root" . "component" "registry") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.registry.service.port }}
+      targetPort: http
+{{- if .Values.registry.ingress.enabled }}
+---
+{{ include "regix.ingress" (dict "root" . "name" (include "regix.registry.name" .) "component" "registry" "ingress" .Values.registry.ingress) }}
+{{- end }}
+{{- end }}

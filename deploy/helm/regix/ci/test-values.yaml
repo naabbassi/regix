@@ -1,0 +1,11 @@
+# Values for trying the chart on a throwaway cluster (kind, k3d, k3s). Not for production:
+# the password is public.
+registry:
+  auth:
+    users:
+      - username: demo
+        password: demo-password
+  persistence:
+    size: 1Gi
+ui:
+  protectedTags: [latest]

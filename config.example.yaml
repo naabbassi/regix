@@ -1,0 +1,41 @@
+# Regix configuration file. Every setting is optional except registry.url, and every setting can
+# also be given as an environment variable (see docs/configuration.md), which takes precedence.
+# Regix reads /etc/regix/config.yaml, or the file named by REGIX_CONFIG.
+
+listen: ":8080"
+title: Regix          # shown in the header and the browser tab
+logLevel: info        # debug, info, warn or error
+
+registry:
+  # Where the Regix server reaches the registry. Inside Kubernetes, use the Service address.
+  url: http://registry.registry.svc:5000
+  # The host shown in `docker pull` commands. Defaults to the host of `url`.
+  pullHost: registry.example.com
+  # A service account, used by the "static" and "none" auth modes only.
+  # username: regix
+  # passwordFile: /etc/regix/registry-password
+  # A CA certificate for a registry with a private certificate.
+  # caFile: /etc/regix/registry-ca.crt
+  # insecureTLS: false
+
+auth:
+  # registry: users sign in with their own registry username and password (default).
+  # static:   users sign in against htpasswdFile; the registry is reached with the service account.
+  # none:     no sign-in. Only behind something else that authenticates, or with readOnly.
+  mode: registry
+  # htpasswdFile: /etc/regix/htpasswd     # bcrypt entries, from `htpasswd -B`
+  sessionTTL: 12h      # signed-in users are signed out after this long without activity
+  cookieSecure: auto   # auto (secure when served over HTTPS), true or false
+
+# Switch off every destructive operation.
+readOnly: false
+
+# Tags that cannot be deleted. `*` matches anything. A pattern with a colon is matched against
+# repository:tag, otherwise against the tag alone.
+protectedTags:
+  - latest
+  # - "v*"
+  # - "team/api:release-*"
+
+# How long listings are reused before the registry is asked again.
+cacheTTL: 30s

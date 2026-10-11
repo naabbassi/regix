@@ -1,0 +1,28 @@
+# Regix in front of a registry you already run.
+#
+#   REGIX_REGISTRY_URL=https://registry.example.com docker compose up -d
+#
+# then open http://localhost:8080 and sign in with your registry username and password.
+# Every setting is described in docs/configuration.md. For a self-contained demo with its own
+# registry, see examples/demo.
+
+services:
+  regix:
+    image: ${REGIX_IMAGE:-regix:latest}
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Where Regix reaches the registry (required).
+      REGIX_REGISTRY_URL: ${REGIX_REGISTRY_URL:?set REGIX_REGISTRY_URL to the address of your registry}
+      # The host people type after `docker pull`, if it differs from the URL above.
+      REGIX_REGISTRY_PULL_HOST: ${REGIX_REGISTRY_PULL_HOST:-}
+      # Tags that can never be deleted from the UI, e.g. "latest,v*".
+      REGIX_PROTECTED_TAGS: ${REGIX_PROTECTED_TAGS:-}
+      # Set to "true" to switch off deleting altogether.
+      REGIX_READ_ONLY: ${REGIX_READ_ONLY:-false}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m

@@ -1,0 +1,11 @@
+# Build output
+/regix
+/internal/web/dist/*
+!/internal/web/dist/.gitkeep
+/ui/node_modules/
+
+# Local configuration and secrets
+.env
+/config.yaml
+
+.DS_Store

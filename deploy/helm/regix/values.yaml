@@ -1,0 +1,171 @@
+# Regix chart: a container registry, its volume, and the Regix web UI in front of it.
+#
+# The least you need to set:
+#
+#   ui.image.repository          where you pushed the Regix image
+#   registry.auth.users          who may push, pull and sign in to the UI
+#   registry.ingress.host        the name clients use in `docker push` / `docker pull`
+#   ui.ingress.host              where people open the UI
+#
+# Examples are in the chart's README.
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Pull secrets for the images of this chart (the Regix image usually lives in a private registry).
+imagePullSecrets: []
+#  - name: regcred
+
+# ------------------------------------------------------------------------------------------------
+# The registry
+# ------------------------------------------------------------------------------------------------
+registry:
+  # Set to false to deploy only the UI, for a registry that already exists (see ui.registryUrl).
+  enabled: true
+
+  image:
+    repository: registry
+    tag: "3.1.2"
+    pullPolicy: IfNotPresent
+
+  auth:
+    # Require a username and password (htpasswd). Switch off only for a registry that is not
+    # reachable from outside, and set ui.authMode accordingly.
+    enabled: true
+    # Accounts to create. Passwords are stored bcrypt-hashed in a Secret.
+    # Prefer passing them at install time over writing them in a file:
+    #   --set registry.auth.users[0].username=ci --set registry.auth.users[0].password=…
+    users: []
+    #  - username: ci
+    #    password: change-me
+    # Or use a Secret you manage yourself, with a key `htpasswd` (bcrypt entries, `htpasswd -B`).
+    existingSecret: ""
+    realm: Registry
+
+  # Where images are stored.
+  persistence:
+    # false keeps images in the pod and loses them when it restarts. For trying things out only.
+    enabled: true
+    size: 10Gi
+    # "" uses the cluster's default storage class.
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+
+  # Allow deleting images through the API. The UI's delete feature needs it.
+  deleteEnabled: true
+
+  # Deleting an image only removes the reference to it; the disk space is freed by the registry's
+  # garbage collector, which must run while the registry is stopped. With this enabled, the
+  # collector runs every time the registry pod starts, and a CronJob restarts the registry on a
+  # schedule. The registry is unavailable for a few seconds during the restart.
+  garbageCollection:
+    enabled: true
+    schedule: "30 3 * * *"
+    # Also remove images that no tag points at any more.
+    deleteUntagged: true
+    # Used by the CronJob to restart the registry.
+    kubectlImage:
+      repository: registry.k8s.io/kubectl
+      tag: v1.35.9
+      pullPolicy: IfNotPresent
+
+  # Merged over the registry configuration this chart generates, for anything not covered above.
+  # Reference: https://distribution.github.io/distribution/about/configuration/
+  configOverrides: {}
+  #  log:
+  #    level: debug
+
+  # Extra environment variables for the registry container (REGISTRY_… overrides, S3 keys, …).
+  extraEnv: []
+
+  service:
+    type: ClusterIP
+    port: 5000
+
+  ingress:
+    enabled: false
+    className: ""
+    # The registry's public name, e.g. registry.example.com. Also shown in the UI's pull commands.
+    host: ""
+    # Image layers are large. With ingress-nginx, lift its upload limit:
+    #   nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    annotations: {}
+    tls:
+      enabled: true
+      # Defaults to <release>-registry-tls (as created by cert-manager from the annotations above).
+      secretName: ""
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+
+# ------------------------------------------------------------------------------------------------
+# The Regix web UI
+# ------------------------------------------------------------------------------------------------
+ui:
+  enabled: true
+
+  image:
+    # Regix is not published to a public registry: build it (see the project README) and name
+    # the image here.
+    repository: regix
+    # Defaults to the chart's appVersion.
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  # The registry to manage when registry.enabled is false, e.g. https://registry.example.com.
+  registryUrl: ""
+  # The host shown in `docker pull` commands. Defaults to registry.ingress.host.
+  pullHost: ""
+
+  # Who may use the UI (docs/configuration.md):
+  #   registry  people sign in with their registry username and password
+  #   static    people sign in against an htpasswd file you mount (extraVolumes, extraEnv)
+  #   none      no sign-in; only behind something else that authenticates
+  authMode: registry
+  # Switch off deleting in the UI.
+  readOnly: false
+  # Tags that cannot be deleted in the UI, e.g. ["latest", "v*"].
+  protectedTags: []
+  title: Regix
+
+  # Extra REGIX_… settings, and volumes for the files they point at.
+  extraEnv: []
+  extraVolumes: []
+  extraVolumeMounts: []
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  ingress:
+    enabled: false
+    className: ""
+    # Where people open the UI, e.g. regix.example.com.
+    host: ""
+    annotations: {}
+    tls:
+      enabled: true
+      # Defaults to <release>-ui-tls.
+      secretName: ""
+
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}

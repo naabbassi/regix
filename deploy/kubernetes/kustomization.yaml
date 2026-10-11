@@ -1,0 +1,14 @@
+# Deploys Regix into its own namespace:
+#
+#   kubectl apply -k deploy/kubernetes
+#
+# Before applying, set the address of your registry in deployment.yaml and, if you want Regix
+# reachable from outside the cluster, the host name in ingress.yaml.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: regix
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
