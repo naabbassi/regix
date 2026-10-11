@@ -1,8 +1,13 @@
-# Publishes the container image to Docker Hub as amanj/regix.
+# Releases a version: publishes the container image to Docker Hub and creates the GitHub release.
 #
-#   push to main         ->  amanj/regix:edge
-#   tag v1.2.3           ->  amanj/regix:1.2.3, :1.2, :1 and :latest
-#   tag v1.2.3-rc.1      ->  amanj/regix:1.2.3-rc.1 only
+# Started by hand: Actions > Release > Run workflow, and enter the version tag, e.g. v1.2.3
+# (the leading "v" is optional; image tags never carry it).
+#   - If the tag exists, that tagged commit is released.
+#   - If it does not, the tag is created at the head of the branch the workflow is run from.
+#
+#   v1.2.3        ->  amanj/regix:1.2.3, :1.2, :1 and :latest
+#   v0.2.3        ->  amanj/regix:0.2.3, :0.2 and :latest
+#   v1.2.3-rc.1   ->  amanj/regix:1.2.3-rc.1 only, marked as a pre-release
 #
 # Needs two repository secrets (Settings > Secrets and variables > Actions):
 #   DOCKERHUB_USERNAME   a Docker Hub account that may push to amanj/regix
@@ -10,46 +15,73 @@
 name: Release
 
 on:
-  push:
-    branches: [main]
-    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag to release, e.g. v1.2.3
+        required: true
+        type: string
 
 permissions:
-  contents: read
+  contents: write # to create the tag and the release
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 env:
   IMAGE: amanj/regix
 
 jobs:
-  test:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # all history and tags, for the release notes
+
+      - name: Resolve the version
+        id: version
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! [[ "$TAG" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::\"$TAG\" is not a version tag. Use the form v1.2.3 (or 1.2.3), optionally with a suffix such as -rc.1."
+            exit 1
+          fi
+          major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]} prerelease=${BASH_REMATCH[4]}
+          version=${TAG#v}
+
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Releasing the existing tag $TAG."
+            git checkout -q "refs/tags/$TAG"
+          else
+            echo "Tag $TAG does not exist yet; it will be created at $(git rev-parse --short HEAD)."
+          fi
+
+          tags="$IMAGE:$version"
+          if [ -z "$prerelease" ]; then
+            tags+=",$IMAGE:$major.$minor,$IMAGE:latest"
+            [ "$major" = 0 ] || tags+=",$IMAGE:$major"
+          fi
+
+          chart=$(sed -n 's/^appVersion: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' deploy/helm/regix/Chart.yaml)
+          if [ "$chart" != "$version" ]; then
+            echo "::warning::The Helm chart's appVersion is $chart, so it deploys $IMAGE:$chart by default, not $version. Update deploy/helm/regix/Chart.yaml."
+          fi
+
+          {
+            echo "tag=$TAG"
+            echo "version=$version"
+            echo "sha=$(git rev-parse HEAD)"
+            echo "tags=$tags"
+            echo "prerelease=${prerelease:+true}"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
       - run: go test ./...
-
-  image:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Work out the tags
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
-            type=raw,value=edge,enable={{is_default_branch}}
 
       - uses: docker/setup-buildx-action@v3
 
@@ -58,15 +90,37 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push the image
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.version.outputs.tags }}
           build-args: |
-            VERSION=${{ steps.meta.outputs.version }}
+            VERSION=${{ steps.version.outputs.version }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.revision=${{ steps.version.outputs.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Last, so that a release only appears once its image can be pulled.
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          SHA: ${{ steps.version.outputs.sha }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; its image has been rebuilt and pushed."
+            exit 0
+          fi
+          notes=$(mktemp)
+          printf 'Container image:\n\n```\ndocker pull %s:%s\n```\n' "$IMAGE" "$VERSION" > "$notes"
+          # Creates the tag at $SHA when it does not exist yet.
+          gh release create "$TAG" --target "$SHA" --title "$TAG" --notes-file "$notes" --generate-notes \
+            ${PRERELEASE:+--prerelease}

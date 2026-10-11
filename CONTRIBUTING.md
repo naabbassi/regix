@@ -43,17 +43,22 @@ Regix aims to stay small. A change fits when it keeps these true:
 
 ## Releasing
 
-The [Release workflow](.github/workflows/release.yml) publishes the image to Docker Hub as
-`amanj/regix`. Every push to `main` updates `amanj/regix:edge`. To cut a release:
+Releases are made by hand with the [Release workflow](.github/workflows/release.yml); pushing code
+or tags publishes nothing.
 
 1. Set `version` and `appVersion` in [deploy/helm/regix/Chart.yaml](deploy/helm/regix/Chart.yaml)
-   to the new version (the chart deploys the image tagged with its `appVersion`).
-2. Tag and push:
+   to the new version (the chart deploys the image tagged with its `appVersion`), and merge that.
+2. On GitHub, open **Actions > Release > Run workflow** and enter the tag, for example `v0.2.0`.
+   Or from a terminal:
 
    ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
+   gh workflow run release.yml -f tag=v0.2.0
    ```
 
-The workflow then pushes `amanj/regix:0.1.0`, `:0.1` and `:latest` for `linux/amd64` and
-`linux/arm64`. A pre-release tag such as `v0.2.0-rc.1` publishes only that exact tag.
+The workflow runs the tests, pushes `amanj/regix:0.2.0`, `:0.2` and `:latest` to Docker Hub for
+`linux/amd64` and `linux/arm64`, and creates the GitHub release with generated notes.
+
+- If the tag does not exist yet, it is created at the head of the branch the workflow runs from.
+- If the tag exists, that tagged commit is what gets built, so an old version can be rebuilt.
+- A pre-release tag such as `v0.3.0-rc.1` publishes only that exact image tag and is marked as a
+  pre-release; `latest` does not move.
