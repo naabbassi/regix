@@ -51,7 +51,7 @@ Open <http://localhost:8080> and sign in as `demo` / `demo-password`.
 ## Install
 
 The image is on Docker Hub as [`amanj/regix`](https://hub.docker.com/r/amanj/regix), for
-`linux/amd64` and `linux/arm64`. Use a version tag such as `amanj/regix:0.1.0` in production;
+`linux/amd64` and `linux/arm64`. Use a version tag such as `amanj/regix:1.0.0` in production;
 `latest` is the newest release.
 
 ### Docker

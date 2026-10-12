@@ -2,9 +2,9 @@ apiVersion: v2
 name: regix
 description: A container registry (CNCF Distribution) with its storage, and the Regix web UI to manage it
 type: application
-version: 0.1.0
+version: 1.0.0
 # The version of the Regix UI image this chart deploys by default.
-appVersion: "0.1.0"
+appVersion: "1.0.0"
 keywords:
   - registry
   - docker

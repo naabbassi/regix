@@ -48,17 +48,25 @@ or tags publishes nothing.
 
 1. Set `version` and `appVersion` in [deploy/helm/regix/Chart.yaml](deploy/helm/regix/Chart.yaml)
    to the new version (the chart deploys the image tagged with its `appVersion`), and merge that.
-2. On GitHub, open **Actions > Release > Run workflow** and enter the tag, for example `v0.2.0`.
+2. On GitHub, open **Actions > Release > Run workflow** and enter the tag, for example `1.1.0`.
    Or from a terminal:
 
    ```bash
-   gh workflow run release.yml -f tag=v0.2.0
+   gh workflow run release.yml -f tag=1.1.0
    ```
 
-The workflow runs the tests, pushes `amanj/regix:0.2.0`, `:0.2` and `:latest` to Docker Hub for
-`linux/amd64` and `linux/arm64`, and creates the GitHub release with generated notes.
+The workflow then, in this order:
+
+1. creates the git tag and the GitHub release, with generated notes;
+2. runs the tests on the tagged commit;
+3. builds the image for `linux/amd64` and `linux/arm64` and pushes it to Docker Hub.
+
+The image is published under **exactly the tag you entered**: `1.1.0` gives `amanj/regix:1.1.0`.
+The only other tag is `amanj/regix:latest`, which also moves unless you untick "Also tag as
+latest" (`-f latest=false`) or the tag is a pre-release such as `1.2.0-rc.1`.
 
 - If the tag does not exist yet, it is created at the head of the branch the workflow runs from.
-- If the tag exists, that tagged commit is what gets built, so an old version can be rebuilt.
-- A pre-release tag such as `v0.3.0-rc.1` publishes only that exact image tag and is marked as a
-  pre-release; `latest` does not move.
+- If the tag exists, that tagged commit is what gets tested and built.
+- If the tests or the build fail, the release already exists but has no image. Fix the cause and
+  run the workflow again with the same tag; it keeps the release and repeats the rest. A fix in
+  the code needs a new tag, since the existing one still points at the old commit.
