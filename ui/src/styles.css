@@ -878,6 +878,7 @@ kbd {
   width: fit-content;
   max-width: 100%;
   overflow-x: auto;
+  scrollbar-width: none;
   margin-bottom: 12px;
   padding: 3px;
   border: 1px solid var(--border);
@@ -911,12 +912,15 @@ kbd {
 
 .tabs {
   margin: 20px 0 14px;
-  border-bottom: 1px solid var(--border);
+  /* The rule under the tabs is a shadow, not a border, so the active tab's underline can sit
+     on it without a negative margin; that margin made the row scroll vertically by a pixel. */
+  box-shadow: inset 0 -1px 0 var(--border);
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
 
 .tabs button {
-  margin-bottom: -1px;
   padding: 9px 12px;
   border-bottom: 2px solid transparent;
 }
